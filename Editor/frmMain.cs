@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -13,7 +14,8 @@ using System.Windows.Forms;
 
 namespace LodeRunner
 {
-    public partial class frmMain : Form {
+    public partial class frmMain : Form
+    {
 
         private Panel[,] pictureBoxes;
         private PictureBox[] picEnemies;
@@ -27,11 +29,12 @@ namespace LodeRunner
         private List<Int16> gamesPerLevels = new List<Int16>();
 
         private LevelElement selectedElementIndex = LevelElement.Brick;
-
+        private bool mouseDown;
         private const int WIDTH = 14;
         private const int HEIGHT = 16;
 
-        public frmMain() {
+        public frmMain()
+        {
 
             InitializeComponent();
 
@@ -62,23 +65,50 @@ namespace LodeRunner
             initControlsRecursive(pnlLevel.Controls);
             mnuElementSelect.Tag = 1;
 
-            for (int x = 0; x < tsElements.Length; x++) {
+            for (int x = 0; x < tsElements.Length; x++)
+            {
                 tsElements[x].Paint += tsElement_Paint;
                 tsElements[x].Click += tsElement_Click;
             }
 
-            for (int x = 0; x < picReentryPoints.Length; x++) {
+            for (int x = 0; x < picReentryPoints.Length; x++)
+            {
                 picReentryPoints[x].Click += picReentryPoints_Click;
             }
 
         }
 
-        void initControlsRecursive(Control.ControlCollection coll) {
+        private void PnlLevel_MouseUp(object sender, MouseEventArgs e)
+        {
+            mouseDown = false;
+        }
 
-            foreach (Control control in coll) {
+        private void PnlLevel_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (mouseDown)
+            {
+
+                ControlOnMouseClick(pnlLevel.GetChildAtPoint(pnlLevel.PointToClient(Cursor.Position)), e);
+            }
+        }
+
+        private void PnlLevel_MouseDown(object sender, MouseEventArgs e)
+        {
+            mouseDown = true;
+        }
+
+        void initControlsRecursive(Control.ControlCollection coll)
+        {
+
+            foreach (Control control in coll)
+            {
 
                 control.MouseClick += ControlOnMouseClick;
-
+                control.MouseMove += PnlLevel_MouseMove;
+                control.MouseDown += PnlLevel_MouseDown;
+                control.MouseUp += PnlLevel_MouseUp;
+                control.MouseHover += Control_MouseHover;
+                control.MouseEnter += Control_MouseHover;
                 Padding margin = control.Margin;
                 margin.Left = 0;
                 margin.Right = 0;
@@ -94,36 +124,51 @@ namespace LodeRunner
             }
 
 
-            foreach (Control control in picEnemies) {
+            foreach (Control control in picEnemies)
+            {
 
                 control.MouseClick += ControlOnMouseClick;
-
             }
 
         }
 
-        private int leftValue(int val) {
+        private void Control_MouseHover(object sender, EventArgs e)
+        {
+            if (mouseDown)
+            {
+                PnlLevel_MouseMove(sender, new MouseEventArgs(MouseButtons.None, 1,
+                    Cursor.Position.X, Cursor.Position.Y, 0));
+            }
+        }
+
+        private int leftValue(int val)
+        {
 
             return val >> 4;
 
         }
 
-        private int rightValue(int val) {
+        private int rightValue(int val)
+        {
 
             return val & 0x0F;
 
         }
 
-        private void loadLevel(LevelDefinition levelDefinition, int[] data) {
+        private void loadLevel(LevelDefinition levelDefinition, int[] data)
+        {
 
             int dataOffset = 0;
             int goldLeft = 0;
 
-            if (levelDefinition.EncryptionType == EncryptionType.Grid) {
+            if (levelDefinition.EncryptionType == EncryptionType.Grid)
+            {
 
-                for (int y = 0; y < HEIGHT; y++) {
+                for (int y = 0; y < HEIGHT; y++)
+                {
 
-                    for (int x = 0; x < WIDTH; x++) {
+                    for (int x = 0; x < WIDTH; x++)
+                    {
 
                         int element = data[dataOffset++];
 
@@ -138,11 +183,13 @@ namespace LodeRunner
                 }
 
             }
-            else {
+            else
+            {
 
                 int cursor = 0;
 
-                while (true) {
+                while (true)
+                {
 
                     int element = data[dataOffset];
                     int block = (element & 0xE0) >> 5;
@@ -150,13 +197,16 @@ namespace LodeRunner
 
                     if (block == ((int)LevelElement.Gold)) { goldLeft++; }
 
-                    if (run > 0) {
+                    if (run > 0)
+                    {
 
                         dataOffset++;
 
-                        for (int x = 0; x < run; x++) {
+                        for (int x = 0; x < run; x++)
+                        {
 
-                            if (levelDefinition.EncryptionType == EncryptionType.RLE_Row) {
+                            if (levelDefinition.EncryptionType == EncryptionType.RLE_Row)
+                            {
 
                                 int row = cursor / (WIDTH * 2);
                                 int col = (cursor % (WIDTH * 2));
@@ -164,7 +214,8 @@ namespace LodeRunner
                                 levelDefinition.Grid[row, col] = (LevelElement)block;
 
                             }
-                            else {
+                            else
+                            {
 
                                 int col = cursor / HEIGHT;
                                 int row = cursor % HEIGHT;
@@ -178,7 +229,8 @@ namespace LodeRunner
                         }
 
                     }
-                    else {
+                    else
+                    {
 
                         break;
 
@@ -191,7 +243,8 @@ namespace LodeRunner
 
             // Map level ladders to grid ..
 
-            foreach (CoordinateSet levelLadder in levelDefinition.Ladders) {
+            foreach (CoordinateSet levelLadder in levelDefinition.Ladders)
+            {
 
                 levelDefinition.Grid[levelLadder.Y, levelLadder.X] = LevelElement.Level_Ladder;
 
@@ -199,7 +252,8 @@ namespace LodeRunner
 
         }
 
-        private void mnuLoad_Click(object sender, EventArgs e) {
+        private void mnuLoad_Click(object sender, EventArgs e)
+        {
 
             clearLevel();
             cmdSave.Enabled = false;
@@ -210,7 +264,8 @@ namespace LodeRunner
 
             bool inLevel = false;
 
-            if (dgOpenMapData.ShowDialog() == DialogResult.OK) {
+            if (dgOpenMapData.ShowDialog() == DialogResult.OK)
+            {
 
                 mnuSave.Enabled = true;
                 mnuSaveAs.Enabled = true;
@@ -224,53 +279,56 @@ namespace LodeRunner
 
                 using (FileStream fs = File.Open(dgOpenMapData.FileName, FileMode.Open))
                 using (BufferedStream bs = new BufferedStream(fs, System.Text.ASCIIEncoding.Unicode.GetByteCount("g")))
-                using (StreamReader sr = new StreamReader(bs)) {
-
+                using (StreamReader sr = new StreamReader(bs))
+                {
                     LevelDefinition levelDefinition = null;
                     string line;
-                    while ((line = sr.ReadLine()) != null) {
-
-                        if (line.StartsWith("#define GAME_NUMBER")) {
-
+                    while ((line = sr.ReadLine()) != null)
+                    {
+                        if (line.StartsWith("#define GAME_NUMBER"))
+                        {
                             gameNumber = line.Substring(@"#define GAME_NUMBER".Length + 1).Trim();
-
                         }
-                        else if (line.StartsWith("#define NUMBER_OF_GAMES")) {
+                        else if (line.StartsWith("#define NUMBER_OF_GAMES"))
+                        {
 
                             numberOfGames = line.Substring(@"#define NUMBER_OF_GAMES".Length + 1).Trim();
 
                         }
-                        else if (line.StartsWith("#if GAME_NUMBER")) {
+                        else if (line.StartsWith("#if GAME_NUMBER"))
+                        {
 
                             gameNumberId = Int16.Parse(line.Substring(line.IndexOf("==") + 3).Trim());
 
                         }
-                        else if (line.StartsWith("  #define LEVEL_COUNT")) {
+                        else if (line.StartsWith("  #define LEVEL_COUNT"))
+                        {
 
                             Int16 gamesPerLevel = Int16.Parse(line.Substring(@"  #define LEVEL_COUNT".Length + 1).Trim());
                             gamesPerLevels.Add(gamesPerLevel);
                             dgExport.Rows.Add(dgExport.Rows.Count, gamesPerLevel);
 
                         }
-                        else if (line.StartsWith("const uint8_t PROGMEM")) {
-
+                        else if (line.StartsWith("const uint8_t PROGMEM"))
+                        {
                             levelDefinition = new LevelDefinition();
                             levelDefinition.LevelName = line.Substring(line.IndexOf("PROGMEM ") + 8, line.Length - line.IndexOf("PROGMEM ") - 14);
                             inLevel = true;
                         }
-                        else if (inLevel) {
+                        else if (inLevel)
+                        {
 
-                            if (line == "};") {
+                            if (line == "};")
+                            {
 
                                 inLevel = false;
                                 ListViewItem item = new ListViewItem();
                                 item.Text = levelDefinition.LevelName;
                                 item.Tag = levelDefinition;
                                 lstLevels.Items.Add(item);
-
                             }
-                            else {
-
+                            else
+                            {
                                 char[] splitchar = { ',' };
                                 String[] strData = line.Trim().Split(splitchar);
 
@@ -278,19 +336,16 @@ namespace LodeRunner
 
 
                                 // Player start pos ..
-
                                 CoordinateSet player = new CoordinateSet();
                                 player.X = Convert.ToInt32(strData[cursor++].Trim(), 16);
                                 player.Y = Convert.ToInt32(strData[cursor++].Trim(), 16);
                                 levelDefinition.Player = player;
 
-
                                 // Enemies
-
                                 int numberOfEnemies = Convert.ToInt32(strData[cursor++].Trim(), 16);
 
-                                for (int x = 0; x < numberOfEnemies; x++) {
-
+                                for (int x = 0; x < numberOfEnemies; x++)
+                                {
                                     CoordinateSet enemy = new CoordinateSet();
                                     enemy.X = Convert.ToInt32(strData[cursor++].Trim(), 16);
                                     enemy.Y = Convert.ToInt32(strData[cursor++].Trim(), 16);
@@ -300,28 +355,23 @@ namespace LodeRunner
 
 
                                 // Level Ladders
-
                                 int numberOfLevelLadders = Convert.ToInt32(strData[cursor++].Trim(), 16);
 
-                                for (int x = 0; x < numberOfLevelLadders; x++) {
-
+                                for (int x = 0; x < numberOfLevelLadders; x++)
+                                {
                                     CoordinateSet levelLadder = new CoordinateSet();
                                     levelLadder.X = Convert.ToInt32(strData[cursor++].Trim(), 16);
                                     levelLadder.Y = Convert.ToInt32(strData[cursor++].Trim(), 16);
                                     levelDefinition.Ladders.Add(levelLadder);
-
                                 }
 
-
                                 // Reentry points
-
-                                for (int x = 0; x < 4; x++) {
-
+                                for (int x = 0; x < 4; x++)
+                                {
                                     CoordinateSet reentryPoint = new CoordinateSet();
                                     reentryPoint.X = Convert.ToInt32(strData[cursor++].Trim(), 16);
                                     reentryPoint.Y = Convert.ToInt32(strData[cursor++].Trim(), 16);
                                     levelDefinition.ReentryPoints.Add(reentryPoint);
-
                                 }
 
                                 // Encryption type ..
@@ -329,7 +379,8 @@ namespace LodeRunner
                                 levelDefinition.EncryptionType = (EncryptionType)Convert.ToInt32(strData[cursor++].Trim(), 16);
                                 int[] data = new int[strData.Length - cursor];
 
-                                for (int count = cursor; count <= strData.Length - 2; count++) {
+                                for (int count = cursor; count <= strData.Length - 2; count++)
+                                {
                                     data[count - cursor] = Convert.ToInt32(strData[count].Trim(), 16);
                                 }
 
@@ -345,7 +396,8 @@ namespace LodeRunner
 
             }
 
-            foreach (ListViewItem item in lstLevels.Items) {
+            foreach (ListViewItem item in lstLevels.Items)
+            {
                 validate(item, (LevelDefinition)item.Tag);
             }
 
@@ -355,20 +407,20 @@ namespace LodeRunner
 
         }
 
-        private void lstLevels_SelectedIndexChanged(object sender, EventArgs e) {
-
-            if (lstLevels.SelectedItems.Count > 0 && lstLevels.Tag != lstLevels.SelectedItems[0]) {
-
+        private void lstLevels_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (lstLevels.SelectedItems.Count > 0 && lstLevels.Tag != lstLevels.SelectedItems[0])
+            {
                 lstLevels.Tag = lstLevels.SelectedItems[0];
 
-                if (lstLevels.SelectedItems.Count > 0) {
-
+                if (lstLevels.SelectedItems.Count > 0)
+                {
                     cmdLevelDelete.Enabled = true;
                     LevelDefinition levelDefinition = (LevelDefinition)lstLevels.SelectedItems[0].Tag;
                     loadLevel(levelDefinition);
-
                 }
-                else {
+                else
+                {
 
                     cmdLevelDelete.Enabled = false;
 
@@ -383,24 +435,31 @@ namespace LodeRunner
 
         }
 
-        private void ControlOnMouseClick(object sender, MouseEventArgs args) {
+
+        private void ControlOnMouseClick(object sender, MouseEventArgs args)
+        {
 
             String name = "";
             int x = -1;
             int y = -1;
 
-            if (lstLevels.SelectedItems.Count > 0) {
+            if (lstLevels.SelectedItems.Count > 0)
+            {
 
-                if (args.Button == MouseButtons.Left) {
+                if (args.Button == MouseButtons.Left)
+                {
 
-                    if (sender is Panel) {
+                    if (sender is Panel)
+                    {
 
                         name = ((Panel)sender).Name;
                         x = int.Parse(name.Substring(3, 2), System.Globalization.NumberStyles.HexNumber);
                         y = int.Parse(name.Substring(5, 1), System.Globalization.NumberStyles.HexNumber);
+                        Debug.WriteLine(x + " " + y);
 
                     }
-                    else if (sender is PictureBox) {
+                    else if (sender is PictureBox)
+                    {
 
                         name = ((PictureBox)sender).Name;
                         CoordinateSet enemyCoordiantes = (CoordinateSet)((PictureBox)sender).Tag;
@@ -409,26 +468,26 @@ namespace LodeRunner
 
                     }
 
-                    switch (selectedElementIndex) {
+                    switch (selectedElementIndex)
+                    {
 
                         case LevelElement.ReentryPoint:
-
                             int reentryPointCount = 0;
-                            foreach (PictureBox picReentryPoint in picReentryPoints) {
-
+                            foreach (PictureBox picReentryPoint in picReentryPoints)
+                            {
                                 if (picReentryPoint.Tag != null) { reentryPointCount++; }
-
                             }
 
-                            if (reentryPointCount == 4) {
+                            if (reentryPointCount == 4)
+                            {
                                 MessageBox.Show("A maximum of 4 re-entry points can be added per level.", "Level Design Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                                 return;
                             }
 
-                            foreach (PictureBox picReentryPoint in picReentryPoints) {
-
-                                if (picReentryPoint.Tag == null) {
-
+                            foreach (PictureBox picReentryPoint in picReentryPoints)
+                            {
+                                if (picReentryPoint.Tag == null)
+                                {
                                     picReentryPoint.Parent = pictureBoxes[y, x];
                                     picReentryPoint.BackColor = Color.Transparent;
                                     picReentryPoint.Location = new System.Drawing.Point(0, 0);
@@ -439,16 +498,13 @@ namespace LodeRunner
                                     reentryCoords.Y = y;
                                     picReentryPoint.Tag = reentryCoords;
                                     return;
-
                                 }
-
                             }
-
                             break;
-
                         case LevelElement.Level_Ladder:
 
-                            if (getCountOfLevelElements(LevelElement.Level_Ladder) > 18) {
+                            if (getCountOfLevelElements(LevelElement.Level_Ladder) > 18)
+                            {
                                 MessageBox.Show("A maximum of 18 escape ladders can be added per level.", "Level Design Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                                 return;
                             }
@@ -459,15 +515,18 @@ namespace LodeRunner
 
                             int count = 0;
 
-                            foreach (PictureBox picEnemy in picEnemies) {
+                            foreach (PictureBox picEnemy in picEnemies)
+                            {
 
-                                if (picEnemy.Tag != null) {
+                                if (picEnemy.Tag != null)
+                                {
 
                                     count++;
 
                                     CoordinateSet enemyPosition = (CoordinateSet)picEnemy.Tag;
 
-                                    if (enemyPosition.X == x && enemyPosition.Y == y) {
+                                    if (enemyPosition.X == x && enemyPosition.Y == y)
+                                    {
 
                                         picEnemy.Tag = null;
                                         picEnemy.Visible = false;
@@ -479,15 +538,18 @@ namespace LodeRunner
 
                             }
 
-                            if (count == 6) {
+                            if (count == 6)
+                            {
                                 MessageBox.Show("A maximum of 6 enemies can be added per level.", "Level Design Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                                 return;
 
                             }
 
-                            foreach (PictureBox picEnemy in picEnemies) {
+                            foreach (PictureBox picEnemy in picEnemies)
+                            {
 
-                                if (picEnemy.Tag == null) {
+                                if (picEnemy.Tag == null)
+                                {
 
                                     picEnemy.Parent = pictureBoxes[y, x];
                                     picEnemy.BackColor = Color.Transparent;
@@ -522,24 +584,30 @@ namespace LodeRunner
 
                     }
 
+                    if (x != -1)
+                    {
+                        pictureBoxes[y, x].BackgroundImage = imgBlocks.Images[(int)selectedElementIndex];
+                        pictureBoxes[y, x].Tag = (int)selectedElementIndex;
+                    }
 
-                    pictureBoxes[y, x].BackgroundImage = imgBlocks.Images[(int)selectedElementIndex];
-                    pictureBoxes[y, x].Tag = (int)selectedElementIndex;
 
                 }
-                else {
+                else
+                {
 
                     mnuElementSelect.Show(Cursor.Position);
 
                 }
 
             }
-            
-        }
-        
-        private void mnuLevelItem_Click(ToolStripMenuItem selectedItem, int index) {
 
-            foreach (ToolStripMenuItem item in mnuLevelElements) {
+        }
+
+        private void mnuLevelItem_Click(ToolStripMenuItem selectedItem, int index)
+        {
+
+            foreach (ToolStripMenuItem item in mnuLevelElements)
+            {
 
                 item.Checked = false;
 
@@ -550,53 +618,66 @@ namespace LodeRunner
 
         }
 
-        private void mnuLevelItem_00_Click(object sender, EventArgs e) {
+        private void mnuLevelItem_00_Click(object sender, EventArgs e)
+        {
             mnuLevelItem_Click((ToolStripMenuItem)sender, 0);
         }
 
-        private void mnuLevelItem_01_Click(object sender, EventArgs e) {
+        private void mnuLevelItem_01_Click(object sender, EventArgs e)
+        {
             mnuLevelItem_Click((ToolStripMenuItem)sender, 1);
         }
 
-        private void mnuLevelItem_02_Click(object sender, EventArgs e) {
+        private void mnuLevelItem_02_Click(object sender, EventArgs e)
+        {
             mnuLevelItem_Click((ToolStripMenuItem)sender, 2);
         }
 
-        private void mnuLevelItem_03_Click(object sender, EventArgs e) {
+        private void mnuLevelItem_03_Click(object sender, EventArgs e)
+        {
             mnuLevelItem_Click((ToolStripMenuItem)sender, 3);
         }
 
-        private void mnuLevelItem_04_Click(object sender, EventArgs e) {
+        private void mnuLevelItem_04_Click(object sender, EventArgs e)
+        {
             mnuLevelItem_Click((ToolStripMenuItem)sender, 4);
         }
 
-        private void mnuLevelItem_05_Click(object sender, EventArgs e) {
+        private void mnuLevelItem_05_Click(object sender, EventArgs e)
+        {
             mnuLevelItem_Click((ToolStripMenuItem)sender, 5);
         }
 
-        private void mnuLevelItem_06_Click(object sender, EventArgs e) {
+        private void mnuLevelItem_06_Click(object sender, EventArgs e)
+        {
             mnuLevelItem_Click((ToolStripMenuItem)sender, 6);
         }
 
-        private void mnuLevelItem_07_Click(object sender, EventArgs e) {
+        private void mnuLevelItem_07_Click(object sender, EventArgs e)
+        {
             mnuLevelItem_Click((ToolStripMenuItem)sender, 7);
         }
-        
-        private void mnuLevelItem_08_Click(object sender, EventArgs e) {
+
+        private void mnuLevelItem_08_Click(object sender, EventArgs e)
+        {
             mnuLevelItem_Click((ToolStripMenuItem)sender, 8);
         }
 
-        private void mnuLevelItem_09_Click(object sender, EventArgs e) {
+        private void mnuLevelItem_09_Click(object sender, EventArgs e)
+        {
             mnuLevelItem_Click((ToolStripMenuItem)sender, 9);
         }
 
-        int getCountOfLevelElements(LevelElement levelElement) {
+        int getCountOfLevelElements(LevelElement levelElement)
+        {
 
             int count = 0;
 
-            for (int y = 0; y < 16; y++) {
+            for (int y = 0; y < 16; y++)
+            {
 
-                for (int x = 0; x < 28; x++) {
+                for (int x = 0; x < 28; x++)
+                {
 
                     if ((int)pictureBoxes[y, x].Tag == (int)levelElement) count++;
 
@@ -608,15 +689,18 @@ namespace LodeRunner
 
         }
 
-        int getCountOfLevelElements(LevelDefinition levelDefinition, LevelElement levelElement) {
+        int getCountOfLevelElements(LevelDefinition levelDefinition, LevelElement levelElement)
+        {
 
             int count = 0;
 
-            for (int y = 0; y < 16; y++) {
+            for (int y = 0; y < 16; y++)
+            {
 
-                for (int x = 0; x < 28; x++) {
+                for (int x = 0; x < 28; x++)
+                {
 
-                    if (levelDefinition.Grid[y,x] == levelElement) count++;
+                    if (levelDefinition.Grid[y, x] == levelElement) count++;
 
                 }
 
@@ -626,21 +710,26 @@ namespace LodeRunner
 
         }
 
-        private void tsElement_Paint(object sender, PaintEventArgs e) {
+        private void tsElement_Paint(object sender, PaintEventArgs e)
+        {
 
             Rectangle picRectangle = new Rectangle(0, 0, 22, 22);
 
-            if (selectedElementIndex == (LevelElement)Int16.Parse( (String)((ToolStripButton)sender).Tag) ) {
+            if (selectedElementIndex == (LevelElement)Int16.Parse((String)((ToolStripButton)sender).Tag))
+            {
                 ControlPaint.DrawBorder(e.Graphics, picRectangle, Color.Red, ButtonBorderStyle.Solid);
             }
-            else {
+            else
+            {
                 ControlPaint.DrawBorder(e.Graphics, picRectangle, SystemColors.ControlLight, ButtonBorderStyle.Solid);
             }
         }
 
-        private void tsElement_Click(object sender, EventArgs e) {
+        private void tsElement_Click(object sender, EventArgs e)
+        {
 
-            if (lstLevels.SelectedItems.Count > 0) {
+            if (lstLevels.SelectedItems.Count > 0)
+            {
 
                 selectedElementIndex = (LevelElement)Int16.Parse((String)((ToolStripButton)sender).Tag);
                 tsTopMenu.Refresh();
@@ -649,9 +738,11 @@ namespace LodeRunner
 
         }
 
-        private void picReentryPoints_Click(object sender, EventArgs e) {
+        private void picReentryPoints_Click(object sender, EventArgs e)
+        {
 
-            if (lstLevels.SelectedItems.Count > 0) {
+            if (lstLevels.SelectedItems.Count > 0)
+            {
 
                 ((PictureBox)sender).Visible = false;
                 ((PictureBox)sender).Tag = null;
@@ -660,32 +751,38 @@ namespace LodeRunner
 
         }
 
-        private void cmdClear_Click(object sender, EventArgs e) {
+        private void cmdClear_Click(object sender, EventArgs e)
+        {
 
             clearLevel();
             lstLevels.Select();
 
         }
 
-        private void clearLevel() { 
+        private void clearLevel()
+        {
 
-            for (int x = 0; x < picEnemies.Length; x++) {
+            for (int x = 0; x < picEnemies.Length; x++)
+            {
 
                 picEnemies[x].Tag = null;
                 picEnemies[x].Visible = false;
 
             }
 
-            for (int x = 0; x < picReentryPoints.Length; x++) {
+            for (int x = 0; x < picReentryPoints.Length; x++)
+            {
 
                 picReentryPoints[x].Tag = null;
                 picReentryPoints[x].Visible = false;
 
             }
 
-            for (int y = 0; y < 16; y++) {
+            for (int y = 0; y < 16; y++)
+            {
 
-                for (int x = 0; x < 28; x++) {
+                for (int x = 0; x < 28; x++)
+                {
 
                     pictureBoxes[y, x].BackgroundImage = imgBlocks.Images[(int)LevelElement.Blank];
                     pictureBoxes[y, x].Tag = (int)LevelElement.Blank;
@@ -699,9 +796,11 @@ namespace LodeRunner
 
         }
 
-        private void cmdReset_Click(object sender, EventArgs e) {
+        private void cmdReset_Click(object sender, EventArgs e)
+        {
 
-            if (lstLevels.SelectedItems.Count > 0) {
+            if (lstLevels.SelectedItems.Count > 0)
+            {
 
                 LevelDefinition levelDefinition = (LevelDefinition)lstLevels.SelectedItems[0].Tag;
                 loadLevel(levelDefinition);
@@ -711,12 +810,15 @@ namespace LodeRunner
 
         }
 
-        private void loadLevel(LevelDefinition levelDefinition) {
+        private void loadLevel(LevelDefinition levelDefinition)
+        {
 
 
-            for (int y = 0; y < 16; y++) {
+            for (int y = 0; y < 16; y++)
+            {
 
-                for (int x = 0; x < 28; x++) {
+                for (int x = 0; x < 28; x++)
+                {
 
                     pictureBoxes[y, x].BackgroundImage = imgBlocks.Images[(int)levelDefinition.Grid[y, x]];
                     pictureBoxes[y, x].Tag = (int)levelDefinition.Grid[y, x];
@@ -728,11 +830,13 @@ namespace LodeRunner
 
             // Enemies ..
 
-            for (int x = 0; x < 6; x++) {
+            for (int x = 0; x < 6; x++)
+            {
 
                 PictureBox picEnemy = picEnemies[x];
 
-                if (x < levelDefinition.Enemies.Count) {
+                if (x < levelDefinition.Enemies.Count)
+                {
 
                     CoordinateSet enemyCoords = levelDefinition.Enemies[x];
                     picEnemy.Parent = pictureBoxes[enemyCoords.Y, enemyCoords.X];
@@ -742,7 +846,8 @@ namespace LodeRunner
                     picEnemy.Tag = enemyCoords;
 
                 }
-                else {
+                else
+                {
 
                     picEnemy.Visible = false;
                     picEnemy.Tag = null;
@@ -754,11 +859,13 @@ namespace LodeRunner
 
             // Reentry Points ..
 
-            for (int x = 0; x < 4; x++) {
+            for (int x = 0; x < 4; x++)
+            {
 
                 PictureBox picReentryPoint = picReentryPoints[x];
 
-                if (x < levelDefinition.ReentryPoints.Count) {
+                if (x < levelDefinition.ReentryPoints.Count)
+                {
 
                     CoordinateSet reentryPointyCoords = levelDefinition.ReentryPoints[x];
                     picReentryPoint.Parent = pictureBoxes[reentryPointyCoords.Y, reentryPointyCoords.X];
@@ -768,7 +875,8 @@ namespace LodeRunner
                     picReentryPoint.Tag = reentryPointyCoords;
 
                 }
-                else {
+                else
+                {
 
                     picReentryPoint.Visible = false;
                     picReentryPoint.Tag = null;
@@ -783,7 +891,8 @@ namespace LodeRunner
             CoordinateSet playerCoords = levelDefinition.Player;
             picPlayer.Visible = false;
 
-            if (playerCoords != null) {
+            if (playerCoords != null)
+            {
 
                 picPlayer.Parent = pictureBoxes[playerCoords.Y, playerCoords.X];
                 picPlayer.BackColor = Color.Transparent;
@@ -802,9 +911,11 @@ namespace LodeRunner
 
         }
 
-        private void cmdSave_Click(object sender, EventArgs e) {
+        private void cmdSave_Click(object sender, EventArgs e)
+        {
 
-            if (lstLevels.SelectedItems.Count > 0) {
+            if (lstLevels.SelectedItems.Count > 0)
+            {
 
                 LevelDefinition levelDefinition = (LevelDefinition)lstLevels.SelectedItems[0].Tag;
 
@@ -812,9 +923,11 @@ namespace LodeRunner
                 // Enemies ..
 
                 levelDefinition.Enemies.Clear();
-                for (int x = 0; x < picEnemies.Length; x++) {
+                for (int x = 0; x < picEnemies.Length; x++)
+                {
 
-                    if (picEnemies[x].Visible) {
+                    if (picEnemies[x].Visible)
+                    {
                         CoordinateSet coordinate = (CoordinateSet)picEnemies[x].Tag;
                         levelDefinition.Enemies.Add(coordinate);
                     }
@@ -823,36 +936,32 @@ namespace LodeRunner
 
 
                 // Reentry points ..
-
                 levelDefinition.ReentryPoints.Clear();
-                for (int x = 0; x < picReentryPoints.Length; x++) {
-
-                    if (picReentryPoints[x].Visible) {
+                for (int x = 0; x < picReentryPoints.Length; x++)
+                {
+                    if (picReentryPoints[x].Visible)
+                    {
                         CoordinateSet coordinate = (CoordinateSet)picReentryPoints[x].Tag;
                         levelDefinition.ReentryPoints.Add(coordinate);
                     }
-
                 }
 
-                for (int y = 0; y < 16; y++) {
-
-                    for (int x = 0; x < 28; x++) {
-
-                        levelDefinition.Grid[y,x] = (LevelElement)pictureBoxes[y, x].Tag;
-
+                for (int y = 0; y < 16; y++)
+                {
+                    for (int x = 0; x < 28; x++)
+                    {
+                        levelDefinition.Grid[y, x] = (LevelElement)pictureBoxes[y, x].Tag;
                     }
-
                 }
 
                 levelDefinition.Player = (CoordinateSet)picPlayer.Tag;
                 validate(lstLevels.SelectedItems[0], levelDefinition);
                 lstLevels.Select();
-
             }
-
         }
 
-        private void cmdLevelAdd_Click(object sender, EventArgs e) {
+        private void cmdLevelAdd_Click(object sender, EventArgs e)
+        {
 
             ListViewItem item = new ListViewItem();
             item.Text = "level" + lstLevels.Items.Count;
@@ -868,7 +977,8 @@ namespace LodeRunner
 
         }
 
-        private void validate(ListViewItem item, LevelDefinition levelDefinition) {
+        private void validate(ListViewItem item, LevelDefinition levelDefinition)
+        {
 
             bool inError = false;
             ArrayList lstErrors = new ArrayList();
@@ -881,35 +991,41 @@ namespace LodeRunner
             if (getCountOfLevelElements(levelDefinition, LevelElement.Level_Ladder) == 0) { inError = true; lstErrors.Add("At least one level ladder should be placed in a level."); }
 
 
-            if (inError) {
+            if (inError)
+            {
 
                 lstLevels.ShowItemToolTips = true;
                 item.ImageIndex = 1;
 
                 String toolTip = "";
-                foreach (String error in lstErrors) {
+                foreach (String error in lstErrors)
+                {
                     toolTip = toolTip + error + "\n";
                 }
 
                 item.ToolTipText = toolTip;
-
+                mnuSave.Enabled = mnuSaveAs.Enabled = false;
             }
-            else {
+            else
+            {
 
                 lstLevels.ShowItemToolTips = false;
                 item.ImageIndex = 0;
-
+                mnuSave.Enabled = mnuSaveAs.Enabled = lstLevels.Items.Count > 0;
             }
 
         }
 
-        private void cmdLevelDelete_Click(object sender, EventArgs e) {
+        private void cmdLevelDelete_Click(object sender, EventArgs e)
+        {
 
             DialogResult result = MessageBox.Show("Delete selected the level?", "Confirm Deletion", MessageBoxButtons.OKCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1);
-            
-            if (result == DialogResult.OK) {
 
-                if (lstLevels.SelectedItems.Count > 0) {
+            if (result == DialogResult.OK)
+            {
+
+                if (lstLevels.SelectedItems.Count > 0)
+                {
                     lstLevels.SelectedItems[0].Remove();
                     clearLevel();
                     cmdClear.Enabled = false;
@@ -924,31 +1040,38 @@ namespace LodeRunner
         }
 
 
-        private void dgExport_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e) {
+        private void dgExport_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e)
+        {
             e.Control.KeyPress -= new KeyPressEventHandler(colNumberOfGames_KeyPress);
             if (dgExport.CurrentCell.ColumnIndex == 1) //Desired Column
             {
                 TextBox tb = e.Control as TextBox;
-                if (tb != null) {
+                if (tb != null)
+                {
                     tb.KeyPress += new KeyPressEventHandler(colNumberOfGames_KeyPress);
                 }
             }
         }
-        
-        private void colNumberOfGames_KeyPress(object sender, KeyPressEventArgs e) {
-            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar)) {
+
+        private void colNumberOfGames_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
+            {
                 e.Handled = true;
             }
         }
 
-        private void dgExport_DefaultValuesNeeded(object sender, DataGridViewRowEventArgs e) {
+        private void dgExport_DefaultValuesNeeded(object sender, DataGridViewRowEventArgs e)
+        {
             e.Row.Cells[0].Value = dgExport.Rows.Count;
         }
 
-        private void dgExport_UserDeletedRow(object sender, DataGridViewRowEventArgs e) {
+        private void dgExport_UserDeletedRow(object sender, DataGridViewRowEventArgs e)
+        {
 
             Int16 rowId = 1;
-            for (Int16 x = 0; x < dgExport.Rows.Count - 1; x++) {
+            for (Int16 x = 0; x < dgExport.Rows.Count - 1; x++)
+            {
                 DataGridViewRow row = dgExport.Rows[x];
                 row.Cells[0].Value = rowId;
                 rowId++;
@@ -956,24 +1079,25 @@ namespace LodeRunner
 
         }
 
-        private void tabMain_SelectedIndexChanged(object sender, EventArgs e) {
+        private void tabMain_SelectedIndexChanged(object sender, EventArgs e)
+        {
 
-            if (tabMain.SelectedIndex == 0) {
+            if (tabMain.SelectedIndex == 0)
+            {
                 lstLevels.Select();
             }
         }
-
-        private void writeFile(String filename) {
-
-            using (StreamWriter writer = new StreamWriter(filename)) {
-
+        private void writeFile(String filename)
+        {
+            using (StreamWriter writer = new StreamWriter(filename))
+            {
                 writer.Write("#pragma once\n\n#include \"../utils/Arduboy2Ext.h\"\n#include \"../utils/Utils.h\"\n#include \"../utils/Enums.h\"\n\n");
                 writer.Write("#define GAME_NUMBER 1\n");
                 writer.Write("#define NUMBER_OF_GAMES " + (dgExport.Rows.Count - 1) + "\n\n");
 
                 int offset = 0;
-                for (int x = 0; x < (dgExport.Rows.Count - 1); x++) {
-
+                for (int x = 0; x < (dgExport.Rows.Count - 1); x++)
+                {
                     DataGridViewRow dgRow = dgExport.Rows[x];
                     writer.Write("#if GAME_NUMBER == " + (x + 1) + "\n");
                     writer.Write("  #define LEVEL_COUNT         " + dgRow.Cells[1].Value + "\n");
@@ -981,21 +1105,20 @@ namespace LodeRunner
                     writer.Write("#endif\n");
 
                     offset = offset + Convert.ToInt16(dgRow.Cells[1].Value);
-
                 }
 
                 writer.Write("\n\n");
 
-                for (Int16 x = 0; x < lstLevels.Items.Count; x++) {
-
+                for (Int16 x = 0; x < lstLevels.Items.Count; x++)
+                {
                     ListViewItem item = lstLevels.Items[x];
                     LevelDefinition levelDefinition = (LevelDefinition)item.Tag;
                     writer.Write(LevelUtils.getLevelText(item, levelDefinition, x));
-
                 }
 
                 offset = 0;
-                for (int y = 0; y < (dgExport.Rows.Count - 1); y++) {
+                for (int y = 0; y < (dgExport.Rows.Count - 1); y++)
+                {
 
                     DataGridViewRow dgRow = dgExport.Rows[y];
                     int maxPerLevel = Convert.ToInt16(dgRow.Cells[1].Value);
@@ -1005,87 +1128,76 @@ namespace LodeRunner
                     writer.Write("                               ");
 
                     int z = 0;
-                    for (int x = offset; x < offset + maxPerLevel; x++) {
-
+                    for (int x = offset; x < offset + maxPerLevel; x++)
+                    {
                         z++;
                         writer.Write(lstLevels.Items[x].Text + ", ");
 
-                        if (z % 10 == 0) {
+                        if (z % 10 == 0)
+                        {
                             writer.Write("\n                               ");
                         }
-
                     }
                     writer.Write("};\n#endif\n");
 
                     offset = offset + Convert.ToInt16(dgRow.Cells[1].Value);
-
                 }
-
             }
-
         }
 
-        private void cmdLevelUp_Click(object sender, EventArgs e) {
-
-            if (lstLevels.SelectedItems[0].Index > 0) {
-
+        private void cmdLevelUp_Click(object sender, EventArgs e)
+        {
+            if (lstLevels.SelectedItems[0].Index > 0)
+            {
                 int index = lstLevels.SelectedItems[0].Index - 1;
                 ListViewItem lvi = lstLevels.SelectedItems[0];
                 lstLevels.Items.RemoveAt(lvi.Index);
                 lstLevels.Items.Insert(index, lvi);
-
             }
-
         }
 
-        private void cmdLevelDown_Click(object sender, EventArgs e) {
-
-            if (lstLevels.SelectedItems[0].Index < lstLevels.Items.Count) {
-
+        private void cmdLevelDown_Click(object sender, EventArgs e)
+        {
+            if (lstLevels.SelectedItems[0].Index < lstLevels.Items.Count)
+            {
                 int index = lstLevels.SelectedItems[0].Index + 1;
                 ListViewItem lvi = lstLevels.SelectedItems[0];
 
                 lstLevels.Items.RemoveAt(lvi.Index);
                 lstLevels.Items.Insert(index, lvi);
-
             }
-
         }
 
-        private void mnuSave_Click(object sender, EventArgs e) {
-
+        private void mnuSave_Click(object sender, EventArgs e)
+        {
             int numberOfLevels = 0;
 
-
-            for (int y = 0; y < (dgExport.Rows.Count - 1); y++) {
-
+            for (int y = 0; y < (dgExport.Rows.Count - 1); y++)
+            {
                 DataGridViewRow dgRow = dgExport.Rows[y];
                 int maxPerLevel = Convert.ToInt16(dgRow.Cells[1].Value);
 
                 numberOfLevels = numberOfLevels + maxPerLevel;
-
             }
 
-            if (lstLevels.Items.Count != numberOfLevels) {
-
+            if (lstLevels.Items.Count != numberOfLevels)
+            {
                 MessageBox.Show("The overall number of levels does not match the game breakdown.\n\nThe game breakdown can bet set on the 'Export' tab.", "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
                 return;
-
             }
 
             writeFile(dgOpenMapData.FileName);
 
             MessageBox.Show("Level data saved successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
         }
 
-        private void mnuSaveAs_Click(object sender, EventArgs e) {
-
+        private void mnuSaveAs_Click(object sender, EventArgs e)
+        {
             dgSaveMapData.ShowDialog();
 
             // If the file name is not an empty string open it for saving.  
-            if (dgSaveMapData.FileName != "") {
-
+            if (dgSaveMapData.FileName != "")
+            {
                 const string userRoot = "HKEY_CURRENT_USER";
                 const string subkey = "LodeRunner";
                 const string keyName = userRoot + "\\" + subkey;
@@ -1093,13 +1205,9 @@ namespace LodeRunner
                 writeFile(dgSaveMapData.FileName);
 
                 MessageBox.Show("Level data saved successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
             }
-
         }
-
     }
-
 }
 
 

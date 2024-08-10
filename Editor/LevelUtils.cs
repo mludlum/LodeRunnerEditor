@@ -227,7 +227,7 @@ namespace LodeRunner {
 
             // Reentry points ..
 
-            for (int x = 0; x < 4; x++) {
+            for (int x = 0; x < 4 && x < levelDefinition.ReentryPoints.Count; x++) {
 
                 common.Append("0x" + levelDefinition.ReentryPoints[x].X.ToString("X2"));
                 common.Append(", ");
